@@ -9,7 +9,7 @@
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
 [![License](https://img.shields.io/badge/License-MIT-27ae60?style=for-the-badge)](LICENSE)
 
-**An end-to-end machine learning project that predicts heart disease risk using the UCI Cleveland dataset.**
+**An end-to-end machine learning project that predicts heart disease risk using the combined UCI datasets (918 samples).**
 Includes EDA, model training (Logistic Regression & Random Forest), and an interactive Streamlit web app.
 
 [🚀 **Try the Live App →**](https://heart-disease-risk-predictorgitcdheart-disease-risk-predictor.streamlit.app)
@@ -22,7 +22,7 @@ Includes EDA, model training (Logistic Regression & Random Forest), and an inter
 
 ✅ **Live Streamlit Web App** — no install needed, runs in your browser  
 ✅ **Two ML Models** — Random Forest & Logistic Regression, switchable in the UI  
-✅ **86.67% Accuracy | 0.9464 AUC-ROC** — trained on UCI Cleveland dataset  
+✅ **86.67% Accuracy | 0.9464 AUC-ROC** — trained on combined UCI datasets (918 samples)  
 ✅ **13 Interactive Input Controls** — sliders & dropdowns for every clinical feature  
 ✅ **Auto Data Loading** — fetches UCI dataset at runtime, no manual download  
 ✅ **Risk Probability Score** — see exact % confidence alongside the prediction  
@@ -37,8 +37,7 @@ Includes EDA, model training (Logistic Regression & Random Forest), and an inter
 | 🤖 Random Forest | **86.67%** | **0.9464** | ~0.93 |
 | 📈 Logistic Regression | ~84% | ~0.91 | ~0.90 |
 
-> Trained on 237 samples, tested on 60 samples from the UCI Cleveland Heart Disease Dataset (303 patients total).
-
+> Trained on 734 samples, tested on 184 samples from the combined UCI Heart Disease Datasets (918 patients total across Cleveland, Hungary, Switzerland, and VA Long Beach).
 ---
 
 ## 🚀 Live Demo
@@ -80,8 +79,7 @@ Includes EDA, model training (Logistic Regression & Random Forest), and an inter
 | Visualization | matplotlib, seaborn |
 | Web App | Streamlit |
 | Model Persistence | joblib |
-| Dataset | UCI Cleveland Heart Disease (via requests) |
-
+| Dataset | Combined UCI Heart Disease Datasets: Cleveland, Hungary, Switzerland, VA (via requests) |
 ---
 
 ## ⚡ Quick Start
