@@ -1,6 +1,6 @@
 """
 train.py - Heart Disease Risk Predictor
-Trains Logistic Regression and Random Forest models on the UCI Cleveland dataset.
+Trains Logistic Regression and Random Forest models on the UCI combined dataset.
 Saves the best model and scaler to disk using joblib.
 """
 
@@ -9,8 +9,8 @@ import numpy as np
 import joblib
 import os
 from io import StringIO
-
 import requests
+
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -19,151 +19,178 @@ from sklearn.metrics import (
     accuracy_score, classification_report,
     roc_auc_score, confusion_matrix
 )
-import matplotlib
+import matplotlib.pyplot as plt
 matplotlib.use('Agg')  # non-interactive backend
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-# ── Config ────────────────────────────────────────────────
-DATA_URL = (
-    "https://archive.ics.uci.edu/ml/machine-learning-databases"
-    "/heart-disease/processed.cleveland.data"
-)
-COLUMNS = [
-    "age", "sex", "cp", "trestbps", "chol", "fbs",
-    "restecg", "thalach", "exang", "oldpeak", "slope",
-    "ca", "thal", "target"
-]
-MODEL_DIR = "models"
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-
-# ── 1. Load Data ──────────────────────────────────────────
 def load_data():
-    print("Fetching dataset from UCI ML Repository...")
-    response = requests.get(DATA_URL, timeout=30)
-    response.raise_for_status()
-    df = pd.read_csv(
-        StringIO(response.text),
-        header=None,
-        names=COLUMNS,
-        na_values="?"
-    )
-    print(f"Loaded {len(df)} rows, {df.shape[1]} columns.")
+    """
+    Load and combine heart disease data from UCI repository.
+    Combines Cleveland, Hungary, Switzerland, and VA Long Beach datasets.
+    Total: 918 samples
+    """
+    print("Loading UCI combined heart disease dataset...")
+    
+    # URLs for the four UCI datasets
+    base_url = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/"
+    datasets = {
+        'cleveland': 'processed.cleveland.data',
+        'hungarian': 'processed.hungarian.data',
+        'switzerland': 'processed.switzerland.data',
+        'va': 'processed.va.data'
+    }
+    
+    # Column names
+    columns = [
+        'age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg',
+        'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target'
+    ]
+    
+    all_data = []
+    
+    for name, filename in datasets.items():
+        url = base_url + filename
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            df = pd.read_csv(StringIO(response.text), names=columns, na_values='?')
+            print(f"Loaded {name}: {len(df)} samples")
+            all_data.append(df)
+        except Exception as e:
+            print(f"Warning: Could not load {name} dataset: {e}")
+    
+    # Combine all datasets
+    df = pd.concat(all_data, ignore_index=True)
+    print(f"\nTotal samples: {len(df)}")
+    
     return df
 
-
-# ── 2. Preprocess ─────────────────────────────────────────
-def preprocess(df):
-    # Drop rows with missing values
-    df = df.dropna().copy()
-
-    # Binarise target: 0=no disease, 1=disease
-    df["target"] = (df["target"] > 0).astype(int)
-
-    X = df.drop("target", axis=1)
-    y = df["target"]
+def preprocess_data(df):
+    """
+    Preprocess the dataset:
+    - Handle missing values
+    - Convert target to binary (0: no disease, 1: disease)
+    - Select features
+    """
+    print("\nPreprocessing data...")
+    
+    # Convert target to binary (0 = no disease, 1-4 = disease)
+    df['target'] = (df['target'] > 0).astype(int)
+    
+    # Select key features
+    features = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 
+                'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal']
+    
+    # Keep only selected features and target
+    df = df[features + ['target']]
+    
+    # Handle missing values
+    print(f"Missing values before: {df.isnull().sum().sum()}")
+    df = df.dropna()
+    print(f"Missing values after: {df.isnull().sum().sum()}")
+    print(f"Remaining samples: {len(df)}")
+    
+    # Split features and target
+    X = df[features]
+    y = df['target']
+    
+    print(f"\nFeatures shape: {X.shape}")
+    print(f"Target distribution: {y.value_counts().to_dict()}")
+    
     return X, y
 
-
-# ── 3. EDA plots ──────────────────────────────────────────
-def plot_eda(df):
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-
-    # Target distribution
-    df["target_label"] = df["target"].map({0: "No Disease", 1: "Disease"})
-    df["target_label"].value_counts().plot(
-        kind="bar", ax=axes[0], color=["#4CAF50", "#F44336"], edgecolor="white"
-    )
-    axes[0].set_title("Target Distribution")
-    axes[0].set_xlabel("")
-    axes[0].tick_params(rotation=0)
-
-    # Age distribution by target
-    for label, grp in df.groupby("target_label"):
-        axes[1].hist(grp["age"], bins=15, alpha=0.6, label=label)
-    axes[1].set_title("Age Distribution by Target")
-    axes[1].set_xlabel("Age")
-    axes[1].legend()
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(MODEL_DIR, "eda_plots.png"), dpi=120)
-    plt.close()
-    print("EDA plots saved to models/eda_plots.png")
-
-
-# ── 4. Train & Evaluate ───────────────────────────────────
-def train_and_evaluate(X_train, X_test, y_train, y_test, scaler):
-    X_train_s = scaler.transform(X_train)
-    X_test_s  = scaler.transform(X_test)
-
+def train_models(X_train, X_test, y_train, y_test):
+    """
+    Train and compare Logistic Regression and Random Forest models.
+    Returns the best model.
+    """
+    print("\n" + "="*50)
+    print("TRAINING MODELS")
+    print("="*50)
+    
     models = {
-        "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
-        "Random Forest":       RandomForestClassifier(n_estimators=200, random_state=42)
+        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
+        'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42)
     }
-
-    best_model, best_auc = None, 0.0
+    
+    results = {}
+    
     for name, model in models.items():
-        model.fit(X_train_s, y_train)
-        y_pred = model.predict(X_test_s)
-        y_prob = model.predict_proba(X_test_s)[:, 1]
+        print(f"\n{name}:")
+        
+        # Train
+        model.fit(X_train, y_train)
+        
+        # Predict
+        y_pred = model.predict(X_test)
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        
+        # Evaluate
+        accuracy = accuracy_score(y_test, y_pred)
+        roc_auc = roc_auc_score(y_test, y_pred_proba)
+        
+        # Cross-validation
+        cv_scores = cross_val_score(model, X_train, y_train, cv=5)
+        
+        results[name] = {
+            'model': model,
+            'accuracy': accuracy,
+            'roc_auc': roc_auc,
+            'cv_mean': cv_scores.mean(),
+            'cv_std': cv_scores.std()
+        }
+        
+        print(f"  Accuracy: {accuracy:.4f}")
+        print(f"  ROC-AUC: {roc_auc:.4f}")
+        print(f"  CV Score: {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
+        print(f"\nClassification Report:")
+        print(classification_report(y_test, y_pred))
+    
+    # Select best model based on ROC-AUC
+    best_name = max(results, key=lambda x: results[x]['roc_auc'])
+    best_model = results[best_name]['model']
+    
+    print(f"\n{'='*50}")
+    print(f"BEST MODEL: {best_name}")
+    print(f"ROC-AUC: {results[best_name]['roc_auc']:.4f}")
+    print(f"{'='*50}")
+    
+    return best_model, results
 
-        acc = accuracy_score(y_test, y_pred)
-        auc = roc_auc_score(y_test, y_prob)
-        cv  = cross_val_score(model, X_train_s, y_train, cv=5, scoring="roc_auc").mean()
+def save_models(model, scaler):
+    """
+    Save the trained model and scaler to disk.
+    """
+    os.makedirs('models', exist_ok=True)
+    
+    joblib.dump(model, 'models/heart_disease_model.pkl')
+    joblib.dump(scaler, 'models/scaler.pkl')
+    
+    print("\nModels saved successfully!")
+    print("  - models/heart_disease_model.pkl")
+    print("  - models/scaler.pkl")
 
-        print(f"\n{'='*40}")
-        print(f"Model: {name}")
-        print(f"  Accuracy : {acc:.4f}")
-        print(f"  AUC-ROC  : {auc:.4f}")
-        print(f"  CV AUC   : {cv:.4f}")
-        print(classification_report(y_test, y_pred, target_names=["No Disease", "Disease"]))
-
-        if auc > best_auc:
-            best_auc   = auc
-            best_model = model
-            best_name  = name
-
-    print(f"\nBest model: {best_name} (AUC={best_auc:.4f})")
-    return best_model
-
-
-# ── 5. Feature Importance plot ────────────────────────────
-def plot_feature_importance(model, feature_names):
-    if not hasattr(model, "feature_importances_"):
-        return
-    importances = pd.Series(
-        model.feature_importances_, index=feature_names
-    ).sort_values(ascending=False)
-
-    plt.figure(figsize=(8, 5))
-    sns.barplot(x=importances.values, y=importances.index, palette="viridis")
-    plt.title("Feature Importances (Random Forest)")
-    plt.xlabel("Importance")
-    plt.tight_layout()
-    plt.savefig(os.path.join(MODEL_DIR, "feature_importance.png"), dpi=120)
-    plt.close()
-    print("Feature importance plot saved to models/feature_importance.png")
-
-
-# ── Main ──────────────────────────────────────────────────
 if __name__ == "__main__":
+    # Load data
     df = load_data()
-    plot_eda(df)
-
-    X, y = preprocess(df)
+    
+    # Preprocess
+    X, y = preprocess_data(df)
+    
+    # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-
+    
+    # Scale features
     scaler = StandardScaler()
-    scaler.fit(X_train)
-
-    best_model = train_and_evaluate(X_train, X_test, y_train, y_test, scaler)
-    plot_feature_importance(best_model, X.columns.tolist())
-
-    # Save artifacts
-    joblib.dump(best_model, os.path.join(MODEL_DIR, "model.pkl"))
-    joblib.dump(scaler,     os.path.join(MODEL_DIR, "scaler.pkl"))
-    joblib.dump(X.columns.tolist(), os.path.join(MODEL_DIR, "features.pkl"))
-    print("\nModel, scaler and feature list saved to models/")
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Train models
+    best_model, results = train_models(X_train_scaled, X_test_scaled, y_train, y_test)
+    
+    # Save models
+    save_models(best_model, scaler)
+    
+    print("\nTraining completed successfully!")
