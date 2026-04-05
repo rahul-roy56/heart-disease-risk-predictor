@@ -4,14 +4,22 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-red?style=flat-square&logo=streamlit)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-orange?style=flat-square&logo=scikit-learn)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://heart-disease-risk-predictorgitcdheart-disease-risk-predictor.streamlit.app)
 
 An end-to-end machine learning project that predicts heart disease risk using the UCI Cleveland Heart Disease dataset. Includes exploratory data analysis, model training (Logistic Regression & Random Forest), and an interactive Streamlit web app for live predictions.
 
 ---
 
-## Demo
+## 🚀 Live Demo
 
-Run the app locally:
+**Try the app live → [heart-disease-risk-predictor.streamlit.app](https://heart-disease-risk-predictorgitcdheart-disease-risk-predictor.streamlit.app)**
+
+- Choose between Random Forest and Logistic Regression
+- Adjust 13 patient parameters via interactive sliders
+- Get instant risk prediction with probability score
+- View model metrics (Accuracy, AUC-ROC) live
+
+Or run locally:
 ```bash
 streamlit run app.py
 ```
@@ -63,7 +71,7 @@ Dataset is loaded directly from UCI ML Repository — no manual download needed.
 | Model | Accuracy | AUC-ROC |
 |-------|----------|----------|
 | Logistic Regression | ~85% | ~0.91 |
-| Random Forest | ~88% | ~0.93 |
+| Random Forest | ~87% | ~0.95 |
 
 ---
 
